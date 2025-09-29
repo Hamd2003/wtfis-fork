@@ -588,6 +588,151 @@ class BaseView(abc.ABC):
             content.append(Text("No WHOIS data was found", style=self.theme.disclaimer))
         return self._gen_panel(self._gen_group(content))
 
+    def to_json_dict(self) -> dict:
+        result = {
+            "id": self.entity.data.id_
+            # "type": self.entity.data.type,
+        }
+
+        # =============================
+        # VirusTotal
+        # =============================
+        attributes = self.entity.data.attributes
+        vt_section = {
+            "malicious": attributes.last_analysis_stats.malicious,
+            "total": (
+                attributes.last_analysis_stats.harmless
+                + attributes.last_analysis_stats.malicious
+                + attributes.last_analysis_stats.suspicious
+                + attributes.last_analysis_stats.timeout
+                + attributes.last_analysis_stats.undetected
+            ),
+            "reputation": attributes.reputation,
+            "last_modification_date": str(Timestamp(attributes.last_modification_date)),
+            "analysis": {
+                "malicious": attributes.last_analysis_stats.malicious,
+                "harmless": attributes.last_analysis_stats.harmless,
+                "suspicious": attributes.last_analysis_stats.suspicious,
+                "timeout": attributes.last_analysis_stats.timeout,
+                "undetected": attributes.last_analysis_stats.undetected,
+                "flagged_vendors": self._vendors_who_flagged_malicious(),
+            },
+        }
+        
+        # Optional VT fields
+        if hasattr(attributes, "popularity_ranks") and attributes.popularity_ranks.root:
+            vt_section["popularity_ranks"] = {
+                k: v.rank for k, v in attributes.popularity_ranks.root.items()
+            }
+
+        if hasattr(attributes, "categories") and attributes.categories:
+            vt_section["categories"] = list(attributes.categories)
+
+        if hasattr(attributes, "last_dns_records_date"):
+            vt_section["last_seen"] = str(Timestamp(attributes.last_dns_records_date))
+
+        result["virustotal"] = vt_section
+
+        # =============================
+        # GeoASNF
+        # =============================
+        geoasn = self._get_geoasn_enrichment(self.entity.data.id_)
+        if geoasn:
+            result["geoasn"] = {
+                "asn": geoasn.asn,
+                "org": geoasn.org,
+                "isp": geoasn.isp,
+                "location": str(smart_join(geoasn.city, geoasn.region, geoasn.country)),
+                "domain": geoasn.domain,
+                "hostname": geoasn.hostname,
+                "is_proxy": geoasn.is_proxy,
+                "is_anycast": geoasn.is_anycast,
+                "source": geoasn.source,
+                "link": geoasn.link,
+            }
+
+        # =============================
+        # Shodan
+        # =============================
+        shodan = self._get_shodan_enrichment(self.entity.data.id_)
+        if shodan:
+            result["shodan"] = {
+                "os": shodan.os,
+                "services": [f"{p.port}/{p.transport}" for p in shodan.data],
+                "tags": shodan.tags,
+                "last_scan": str(Timestamp(f"{shodan.last_update}+00:00")),
+                "link": f"{self.shodan_gui_baseurl}/{self.entity.data.id_}",
+            }
+
+        # =============================
+        # Greynoise
+        # =============================
+        gn = self._get_greynoise_enrichment(self.entity.data.id_)
+        if gn:
+            result["greynoise"] = {
+                "riot": gn.riot,
+                "noise": gn.noise,
+                "classification": gn.classification,
+                "link": gn.link,
+            }
+
+        # =============================
+        # AbuseIPDB
+        # =============================
+        abuse = self._get_abuseipdb_enrichment(self.entity.data.id_)
+        if abuse:
+            result["abuseipdb"] = {
+                "abuse_confidence_score": abuse.abuse_confidence_score,
+                "total_reports": abuse.total_reports,
+                "ip_address": abuse.ip_address,
+            }
+
+        # =============================
+        # WHOIS
+        # =============================
+        if self.whois:
+            result["whois"] = {
+                "domain": self.whois.domain,
+                "registrar": self.whois.registrar,
+                "organization": self.whois.organization,
+                "name": self.whois.name,
+                "email": self.whois.email,
+                "phone": self.whois.phone,
+                "street": self.whois.street,
+                "city": self.whois.city,
+                "state": self.whois.state,
+                "country": self.whois.country,
+                "postal_code": self.whois.postal_code,
+                "name_servers": self.whois.name_servers,
+                "dnssec": self.whois.dnssec,
+                "date_created": str(Timestamp(self.whois.date_created)),
+                "date_changed": str(Timestamp(self.whois.date_changed)),
+                "date_expires": str(Timestamp(self.whois.date_expires)),
+            }
+
+        # =============================
+        # URLhaus
+        # =============================
+        urlhaus = self._get_urlhaus_enrichment(self.entity.data.id_)
+        if urlhaus:
+            result["urlhaus"] = {
+                "online_url_count": urlhaus.online_url_count,
+                "url_count": urlhaus.url_count,
+                "urlhaus_reference": urlhaus.urlhaus_reference,
+                "tags": urlhaus.tags,
+                "blacklists": {
+                    "spamhaus": (
+                        urlhaus.blacklists.spamhaus_dbl if urlhaus.blacklists else None
+                    ),
+                    "surbl": (
+                        urlhaus.blacklists.surbl if urlhaus.blacklists else None
+                    ),
+                },
+            }
+
+        return result
+
+
     @abc.abstractmethod
     def print(self, one_column: bool = False) -> None:  # pragma: no cover
         pass

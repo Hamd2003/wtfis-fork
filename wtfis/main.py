@@ -13,7 +13,7 @@ from wtfis.ui.base import BaseView
 from wtfis.ui.progress import get_progress
 from wtfis.ui.view import DomainView, IpAddressView
 from wtfis.utils import error_and_exit, is_ip
-
+import json 
 
 def generate_entity_handler(
     config: Config,
@@ -57,6 +57,7 @@ def generate_view(
 ) -> BaseView:
     # Output display
     if isinstance(entity, DomainHandler) and isinstance(entity.vt_info, Domain):
+        print("here domain instance")
         view: BaseView = DomainView(
             console,
             entity.vt_info,
@@ -70,6 +71,7 @@ def generate_view(
             max_resolutions=config.max_resolutions,
         )
     elif isinstance(entity, IpAddressHandler) and isinstance(entity.vt_info, IpAddress):
+        print("here ip instance")
         view = IpAddressView(
             console,
             entity.vt_info,
@@ -111,9 +113,7 @@ def fetch_data(
             progress.stop()
             error_and_exit(str(e))
 
-
 def main():
-    # Load config
     config = Config()
 
     # Instantiate the console
@@ -131,8 +131,20 @@ def main():
     # Print fetch warnings, if any
     entity.print_warnings()
 
-    # Output display
     view = generate_view(config, console, entity)
+
+    obj = view.to_json_dict()
+    with open('ip_logs.json', 'r+') as file:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError:
+            data = []
+
+        data.append(obj)
+
+        file.seek(0)
+
+        json.dump(data, file, indent=4)
 
     # Finally, print output
     view.print(one_column=config.one_column)
