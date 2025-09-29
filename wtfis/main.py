@@ -113,10 +113,7 @@ def fetch_data(
             progress.stop()
             error_and_exit(str(e))
 
-# print("Here")
 def main():
-    # Load config
-    print("HER1E")
     config = Config()
 
     # Instantiate the console
@@ -134,46 +131,20 @@ def main():
     # Print fetch warnings, if any
     entity.print_warnings()
 
-    # obj = entity.to_dict()
-    # with open('ip_logs.json', 'r+') as file:
-    #     try:
-    #         # Load existing data
-    #         data = json.load(file)
-    #     except json.JSONDecodeError:
-    #         # If the file is empty or not a valid JSON, initialize an empty list
-    #         data = []
-
-    #     # Append the new object
-    #     data.append(obj)
-
-    #     # Move the cursor to the beginning of the file
-    #     file.seek(0)
-
-    #     # Write the updated data back to the file with indentation for readability
-    #     json.dump(data, file, indent=4)
-    # print("THIS IS OBJ",obj)
-
-    # Output display
     view = generate_view(config, console, entity)
 
     obj = view.to_json_dict()
     with open('ip_logs.json', 'r+') as file:
         try:
-            # Load existing data
             data = json.load(file)
         except json.JSONDecodeError:
-            # If the file is empty or not a valid JSON, initialize an empty list
             data = []
 
-        # Append the new object
         data.append(obj)
 
-        # Move the cursor to the beginning of the file
         file.seek(0)
 
-        # Write the updated data back to the file with indentation for readability
         json.dump(data, file, indent=4)
-    print("thisisobj",obj)
 
     # Finally, print output
     view.print(one_column=config.one_column)
